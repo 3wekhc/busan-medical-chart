@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>부산 구·군별 의료 격차 히트맵</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans KR', -apple-system, sans-serif;
+  background: #F4F3F0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.07);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 2rem 2rem 1.5rem;
+  width: 100%;
+  max-width: 720px;
+}
+
+.wrap {
+  font-family: 'Noto Sans KR', -apple-system, sans-serif;
+  position: relative;
+}
+
+.chart-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: -0.4px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.chart-sub {
+  font-size: 12.5px;
+  color: #666;
+  margin-bottom: 20px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.heatmap {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.heatmap thead tr th {
+  text-align: center;
+  padding: 0 6px 12px;
+  vertical-align: bottom;
+}
+
+.col-gu    { width: 72px; text-align: left !important; }
+.col-cond  { width: 130px; }
+.col-score { width: 52px; }
+
+.th-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2e1065;
+  display: block;
+  margin-bottom: 2px;
+}
+.th-threshold {
+  font-size: 11px;
+  color: #888;
+  font-weight: 400;
+}
+
+.heatmap tbody tr { border-bottom: 1px solid rgba(0,0,0,0.055); }
+.heatmap tbody tr:last-child { border-bottom: none; }
+
+.td-gu {
+  padding: 5px 10px 5px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #222;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.gu-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #f3e8ff;
+  color: #6b21a8;
+  font-weight: 700;
+}
+
+.td-cond {
+  padding: 5px 5px;
+  vertical-align: middle;
+}
+
+.cond-bar {
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: filter 0.12s, transform 0.12s;
+}
+.cond-bar:hover { filter: brightness(1.15); transform: scaleY(1.06); }
+
+.cond-empty {
+  height: 32px;
+  border-radius: 6px;
+  background: #f3f0fb;
+  cursor: pointer;
+}
+.cond-empty:hover { background: #ede9f7; }
+
+.td-score {
+  text-align: center;
+  padding: 5px 0 5px 8px;
+  vertical-align: middle;
+}
+
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* 툴팁 */
+#tooltip {
+  position: fixed;
+  display: none;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid rgba(109,40,217,0.18);
+  border-radius: 10px;
+  padding: 12px 15px;
+  box-shadow: 0 6px 24px rgba(109,40,217,0.13);
+  font-size: 12.5px;
+  color: #333;
+  line-height: 1.75;
+  pointer-events: none;
+  min-width: 188px;
+}
+#tooltip .tt-gu {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2e1065;
+  margin-bottom: 7px;
+  border-bottom: 1px solid #ede9f7;
+  padding-bottom: 6px;
+}
+#tooltip .tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+#tooltip .tt-label { color: #888; }
+#tooltip .tt-val   { font-weight: 600; color: #1a0533; }
+#tooltip .tt-met   { color: #7c3aed; font-weight: 700; }
+#tooltip .tt-unmet { color: #bbb; }
+#tooltip .tt-score {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid #ede9f7;
+  font-weight: 700;
+  color: #6d28d9;
+  font-size: 12px;
+}
+
+/* 범례 */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.legend-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+}
+.legend-box {
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  background: #f3f0fb;
+}
+.legend-scores { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
+.legend-label  { font-size: 12px; color: #555; margin-left: 4px; }
+
+.source {
+  margin-top: 14px;
+  padding: 9px 11px;
+  background: #F4F3F0;
+  border-radius: 7px;
+  font-size: 11.5px;
+  color: #666;
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+
+<div class="card">
+  <div class="wrap">
+    <div class="chart-title">부산 구·군별 의료 격차 히트맵</div>
+    <div class="chart-sub">각 셀은 해당 조건을 충족하면 색으로 표시됩니다. 겹침 점수는 네 조건의 합계입니다.</div>
+
+    <table class="heatmap" id="heatTable">
+      <thead>
+        <tr>
+          <th class="col-gu" style="text-align:left;font-size:12px;color:#888;font-weight:500;padding-bottom:12px;">구·군</th>
+          <th class="col-cond">
+            <span class="th-label">고령화 높음</span>
+            <span class="th-threshold">≥26.4%</span>
+          </th>
+          <th class="col-cond">
+            <span class="th-label">미충족의료율 높음</span>
+            <span class="th-threshold">≥4.2%</span>
+          </th>
+          <th class="col-cond">
+            <span class="th-label">의사 수 낮음</span>
+            <span class="th-threshold">≤8.4명</span>
+          </th>
+          <th class="col-cond">
+            <span class="th-label">상위진료 없음</span>
+            <span class="th-threshold">0개</span>
+          </th>
+          <th class="col-score">
+            <span class="th-label" style="font-size:12px;">겹침<br>점수</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="heatBody"></tbody>
+    </table>
+
+    <div class="legend">
+      <div class="legend-empty">
+        <div class="legend-box"></div>
+        <span>해당 없음</span>
+      </div>
+      <div class="legend-scores" id="legendScores"></div>
+      <span class="legend-label">겹침 점수 (높을수록 취약)</span>
+    </div>
+
+    <div class="source">
+      <strong style="color:#4c1d95;">데이터 출처:</strong> 전국의료기관표준데이터 (2025), 2025년 주민등록인구현황, 2025 지역사회건강조사
+    </div>
+  </div>
+</div>
+
+<script>
+const rows = [
+  { gu:'사하구',   c1:true,  c2:true,  c3:true,  c4:true,  score:4, ratio:26.7, unmet:4.2, doc:6.2,  upper:0 },
+  { gu:'금정구',   c1:true,  c2:false, c3:true,  c4:true,  score:3, ratio:28.4, unmet:2.1, doc:5.8,  upper:0 },
+  { gu:'영도구',   c1:true,  c2:true,  c3:true,  c4:false, score:3, ratio:35.1, unmet:4.5, doc:4.7,  upper:2 },
+  { gu:'강서구',   c1:false, c2:false, c3:true,  c4:true,  score:2, ratio:15.2, unmet:3.1, doc:4.9,  upper:0 },
+  { gu:'기장군',   c1:false, c2:true,  c3:true,  c4:false, score:2, ratio:20.9, unmet:7.6, doc:6.8,  upper:1 },
+  { gu:'북구',     c1:false, c2:true,  c3:true,  c4:false, score:2, ratio:25.5, unmet:10.0,doc:7.2,  upper:2 },
+  { gu:'사상구',   c1:true,  c2:false, c3:true,  c4:false, score:2, ratio:26.6, unmet:3.5, doc:7.7,  upper:2 },
+  { gu:'서구',     c1:true,  c2:true,  c3:false, c4:false, score:2, ratio:31.1, unmet:5.7, doc:38.5, upper:4 },
+  { gu:'남구',     c1:false, c2:false, c3:true,  c4:false, score:1, ratio:25.5, unmet:2.4, doc:6.2,  upper:1 },
+  { gu:'동구',     c1:true,  c2:false, c3:false, c4:false, score:1, ratio:31.1, unmet:1.8, doc:14.0, upper:3 },
+  { gu:'동래구',   c1:false, c2:true,  c3:false, c4:false, score:1, ratio:23.5, unmet:4.6, doc:10.4, upper:4 },
+  { gu:'수영구',   c1:true,  c2:false, c3:false, c4:false, score:1, ratio:27.0, unmet:2.7, doc:9.8,  upper:3 },
+  { gu:'연제구',   c1:false, c2:true,  c3:false, c4:false, score:1, ratio:24.2, unmet:4.9, doc:9.1,  upper:1 },
+  { gu:'중구',     c1:true,  c2:false, c3:false, c4:false, score:1, ratio:34.2, unmet:2.6, doc:16.5, upper:1 },
+  { gu:'부산진구', c1:false, c2:false, c3:false, c4:false, score:0, ratio:23.9, unmet:2.9, doc:17.0, upper:4 },
+  { gu:'해운대구', c1:false, c2:false, c3:false, c4:false, score:0, ratio:23.5, unmet:3.5, doc:11.9, upper:2 },
+];
+
+const scoreColors = { 4:'#3b0764', 3:'#6b21a8', 2:'#9333ea', 1:'#c084fc', 0:'#ede9f7' };
+const condColorMap = { 4:'#4c1d95', 3:'#7e22ce', 2:'#a855f7', 1:'#d8b4fe', 0:'#f3f0fb' };
+const condLabels = ['고령인구비율','미충족의료율','천명당 의사 수','상위진료 수'];
+const condUnits  = ['%','%','명','개'];
+
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(e, row) {
+  const conds = [row.c1, row.c2, row.c3, row.c4];
+  const vals  = [row.ratio, row.unmet, row.doc, row.upper];
+  let html = `<div class="tt-gu">${row.gu}</div>`;
+  condLabels.forEach((label, i) => {
+    const met = conds[i], val = vals[i], unit = condUnits[i];
+    html += `<div class="tt-row">
+      <span class="tt-label">${label}</span>
+      <span class="tt-val ${met?'tt-met':'tt-unmet'}">${val}${unit}${met?' ✓':''}</span>
+    </div>`;
+  });
+  const scoreLabel = ['취약 없음','취약 낮음','취약 보통','취약 높음','취약 매우 높음'][row.score];
+  html += `<div class="tt-score">겹침 점수 ${row.score}점 · ${scoreLabel}</div>`;
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  positionTooltip(e);
+}
+
+function positionTooltip(e) {
+  const tw = tooltip.offsetWidth || 200, th = tooltip.offsetHeight || 150;
+  let x = e.clientX + 14, y = e.clientY - 10;
+  if (x + tw > window.innerWidth  - 10) x = e.clientX - tw - 14;
+  if (y + th > window.innerHeight - 10) y = e.clientY - th - 10;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+
+document.addEventListener('mousemove', e => {
+  if (tooltip.style.display === 'block') positionTooltip(e);
+});
+
+const tbody = document.getElementById('heatBody');
+
+rows.forEach(row => {
+  const tr = document.createElement('tr');
+  const conds = [row.c1, row.c2, row.c3, row.c4];
+
+  const tdGu = document.createElement('td');
+  tdGu.className = 'td-gu';
+  if (row.score >= 3) {
+    const badge = document.createElement('span');
+    badge.className = 'gu-badge';
+    badge.textContent = row.gu;
+    tdGu.appendChild(badge);
+  } else {
+    tdGu.textContent = row.gu;
+  }
+  tdGu.addEventListener('mouseenter', e => showTooltip(e, row));
+  tdGu.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+  tr.appendChild(tdGu);
+
+  conds.forEach((met, ci) => {
+    const td = document.createElement('td');
+    td.className = 'td-cond';
+    const div = document.createElement('div');
+    div.className = met ? 'cond-bar' : 'cond-empty';
+    if (met) div.style.background = condColorMap[row.score];
+    div.addEventListener('mouseenter', e => showTooltip(e, row));
+    div.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    td.appendChild(div);
+    tr.appendChild(td);
+  });
+
+  const tdScore = document.createElement('td');
+  tdScore.className = 'td-score';
+  const badge = document.createElement('span');
+  badge.className = 'score-badge';
+  badge.style.background = scoreColors[row.score];
+  badge.style.color = row.score <= 0 ? '#999' : '#fff';
+  badge.textContent = row.score;
+  badge.addEventListener('mouseenter', e => showTooltip(e, row));
+  badge.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+  tdScore.appendChild(badge);
+  tr.appendChild(tdScore);
+
+  tbody.appendChild(tr);
+});
+
+const legendScores = document.getElementById('legendScores');
+[4,3,2,1].forEach(s => {
+  const badge = document.createElement('span');
+  badge.className = 'score-badge';
+  badge.style.background = scoreColors[s];
+  badge.style.color = '#fff';
+  badge.style.width = '26px';
+  badge.style.height = '26px';
+  badge.style.fontSize = '12px';
+  badge.textContent = s;
+  legendScores.appendChild(badge);
+});
+</script>
+</body>
+</html>
