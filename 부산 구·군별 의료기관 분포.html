@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>부산 구·군별 의료기관 분포</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: #F4F3F0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.07);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 2rem 2rem 1.5rem;
+  width: 100%;
+  max-width: 760px;
+}
+.chart-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1A1A18;
+  text-align: center;
+  letter-spacing: -0.3px;
+  margin-bottom: 5px;
+}
+.chart-sub {
+  text-align: center;
+  font-size: 13px;
+  color: #73726C;
+  margin-bottom: 20px;
+}
+.chart-wrap { position: relative; width: 100%; height: 680px; }
+.source {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #F4F3F0;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #73726C;
+  line-height: 1.6;
+}
+.source strong { color: #1A1A18; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="card">
+  <p class="chart-title">부산 구·군별 의료기관 분포</p>
+  <p class="chart-sub">부산광역시 16개 구·군 병원급 의료기관 기능 구성 &nbsp;|&nbsp; 총합계 내림차순</p>
+
+  <div class="chart-wrap">
+    <canvas id="bar"></canvas>
+  </div>
+
+  <div class="source">
+    <strong>데이터 출처:</strong> 전국의료기관표준데이터 (2025) &nbsp;|&nbsp; 기타 = 정신병원 + 치과 + 한방
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const raw = [
+  {name:'강서구',   upper:0, care:0,  inp:6,  etc:2,  total:8,  noUpper:true},
+  {name:'금정구',   upper:0, care:15, inp:11, etc:4,  total:30, noUpper:true},
+  {name:'기장군',   upper:1, care:5,  inp:4,  etc:4,  total:14, noUpper:false},
+  {name:'남구',     upper:1, care:8,  inp:6,  etc:6,  total:21, noUpper:false},
+  {name:'동구',     upper:3, care:4,  inp:4,  etc:5,  total:16, noUpper:false},
+  {name:'동래구',   upper:4, care:15, inp:17, etc:8,  total:44, noUpper:false},
+  {name:'부산진구', upper:4, care:12, inp:18, etc:9,  total:43, noUpper:false},
+  {name:'북구',     upper:2, care:12, inp:8,  etc:5,  total:27, noUpper:false},
+  {name:'사상구',   upper:2, care:12, inp:7,  etc:9,  total:30, noUpper:false},
+  {name:'사하구',   upper:0, care:19, inp:20, etc:6,  total:45, noUpper:true},
+  {name:'서구',     upper:4, care:4,  inp:3,  etc:3,  total:14, noUpper:false},
+  {name:'수영구',   upper:3, care:9,  inp:6,  etc:3,  total:21, noUpper:false},
+  {name:'연제구',   upper:1, care:11, inp:13, etc:6,  total:31, noUpper:false},
+  {name:'영도구',   upper:2, care:5,  inp:1,  etc:0,  total:8,  noUpper:false},
+  {name:'중구',     upper:1, care:3,  inp:2,  etc:1,  total:7,  noUpper:false},
+  {name:'해운대구', upper:2, care:11, inp:14, etc:5,  total:32, noUpper:false},
+].sort((a,b) => b.total - a.total);
+
+const noUpperSet = new Set(raw.filter(d=>d.noUpper).map(d=>d.name));
+const highlightNames = new Set(['사하구','금정구','강서구']);
+const labelColor = '#444240';
+const mutedColor = '#888780';
+
+// 범례 항목
+const legendItems = [
+  { label:'상위진료 (종합병원)', color:'#FF6F73' },
+  { label:'입원진료 (병원)',     color:'#FFB7A8' },
+  { label:'요양진료 (요양병원)', color:'#FF8F7A' },
+  { label:'기타 (정신·치과·한방)', color:'#FFD9D0', border:true },
+];
+
+const legendPlugin = {
+  id:'inlineLegend',
+  afterDraw(chart){
+    const {ctx, chartArea:{right, bottom}} = chart;
+    const colW=132, rowH=22, cols=2, rows=2, padX=12, padY=10;
+    const totalW = cols*colW + padX*2;
+    const totalH = rows*rowH + padY*2;
+    const bx = right - totalW - 2;
+    const by = bottom - totalH - 2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, totalW, totalH, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    legendItems.forEach((item, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = bx + padX + col * colW;
+      const y = by + padY + row * rowH;
+      const boxW = 10, boxH = 10;
+
+      ctx.save();
+      ctx.fillStyle = item.color;
+      ctx.fillRect(x, y + (rowH-boxH)/2, boxW, boxH);
+      if (item.border) {
+        ctx.strokeStyle = '#FFB7A8';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(x, y + (rowH-boxH)/2, boxW, boxH);
+      }
+      ctx.font = '11px "Noto Sans KR", sans-serif';
+      ctx.fillStyle = '#444240';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.label, x + boxW + 5, y + rowH/2);
+      ctx.restore();
+    });
+  }
+};
+
+const totalPlugin = {
+  id:'customLabels',
+  afterDatasetsDraw(chart){
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    raw.forEach((d, i) => {
+      const meta = chart.getDatasetMeta(3);
+      const bar = meta.data[i];
+      if (!bar) return;
+      const xEnd = xScale.getPixelForValue(d.total);
+      const yMid = bar.y;
+
+      ctx.save();
+      ctx.font = '400 11.5px "Noto Sans KR", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = mutedColor;
+      ctx.fillText(d.total, xEnd + 6, yMid);
+      ctx.restore();
+
+      if (d.noUpper) {
+        ctx.save();
+        ctx.font = '400 10.5px "Noto Sans KR", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#FF6F73';
+        ctx.fillText('상위진료 0곳', xEnd + 30, yMid);
+        ctx.restore();
+      }
+    });
+  }
+};
+
+new Chart(document.getElementById('bar'), {
+  type: 'bar',
+  data: {
+    labels: raw.map(d => d.name),
+    datasets: [
+      { label:'상위진료', data:raw.map(d=>d.upper), backgroundColor:'#FF6F73', borderWidth:0 },
+      { label:'요양진료', data:raw.map(d=>d.care),  backgroundColor:'#FF8F7A', borderWidth:0 },
+      { label:'입원진료', data:raw.map(d=>d.inp),   backgroundColor:'#FFB7A8', borderWidth:0 },
+      { label:'기타',     data:raw.map(d=>d.etc),   backgroundColor:'#FFD9D0', borderWidth:0.5, borderColor:'#FFB7A8' },
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title(items) { return items[0].label; },
+          afterBody(items) {
+            const d = raw.find(r => r.name === items[0].label);
+            const lines = [`총합: ${d.total}곳`];
+            if (d.noUpper) lines.push('상위진료 없음');
+            return lines;
+          }
+        },
+        backgroundColor: '#FFF5F4',
+        titleColor: '#7A2820',
+        bodyColor: '#A84030',
+        borderColor: 'rgba(255,111,115,0.2)',
+        borderWidth: 1,
+        padding: 10,
+        titleFont: { size:13, weight:'500' },
+        bodyFont: { size:12 }
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        max: 60,
+        title: { display:true, text:'병원급 의료기관 수 (개)', font:{ size:11 }, color: mutedColor },
+        grid: { color:'rgba(255,183,168,0.12)' },
+        ticks: { color: mutedColor, font:{ size:11 } }
+      },
+      y: {
+        stacked: true,
+        grid: { display: false },
+        ticks: {
+          color: ctx => highlightNames.has(raw[ctx.index]?.name) ? '#FF6F73' : labelColor,
+          font:  ctx => ({ size:12, weight: highlightNames.has(raw[ctx.index]?.name) ? '600' : '400' })
+        }
+      }
+    },
+    layout: { padding:{ right:100, left:4, top:4, bottom:4 } }
+  },
+  plugins: [totalPlugin, legendPlugin]
+});
+</script>
+</body>
+</html>
